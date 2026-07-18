@@ -1,10 +1,10 @@
 USE cloudops_ai;
 
-CREATE TABLE users(
+CREATE TABLE users (
 
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
 
-    role_id INT NOT NULL,
+    organization_id BIGINT NOT NULL,
 
     first_name VARCHAR(100),
 
@@ -12,16 +12,20 @@ CREATE TABLE users(
 
     username VARCHAR(100) UNIQUE,
 
-    email VARCHAR(200) UNIQUE,
+    email VARCHAR(150) UNIQUE,
 
     password_hash VARCHAR(255),
 
     phone VARCHAR(20),
 
-    status ENUM(
+    account_status ENUM(
+
         'ACTIVE',
-        'INACTIVE',
-        'BLOCKED'
+
+        'BLOCKED',
+
+        'DISABLED'
+
     ) DEFAULT 'ACTIVE',
 
     last_login DATETIME,
@@ -31,7 +35,8 @@ CREATE TABLE users(
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY(role_id)
-    REFERENCES roles(id)
+    FOREIGN KEY (organization_id)
+
+    REFERENCES organizations(id)
 
 );

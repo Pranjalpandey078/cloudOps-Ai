@@ -2,9 +2,9 @@ USE cloudops_ai;
 
 CREATE TABLE roles (
 
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
 
-    role_name VARCHAR(100) NOT NULL UNIQUE,
+    role_name VARCHAR(100) UNIQUE,
 
     description TEXT,
 
