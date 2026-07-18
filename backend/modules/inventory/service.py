@@ -1,5 +1,5 @@
 from modules.inventory.repository import InventoryRepository
-
+from shared.response import ApiResponse
 
 class InventoryService:
 
@@ -9,11 +9,14 @@ class InventoryService:
 
         server_id = self.repository.create_server(data)
 
-        return {
-            "message": "Server registered successfully",
-            "server_id": server_id
-        }
+        from shared.response import ApiResponse
 
+        return ApiResponse.success(
+    message="Server registered successfully",
+    data={
+        "server_id": server_id
+    }
+)
     def get_all(self):
 
         return self.repository.get_all_servers()
@@ -54,9 +57,10 @@ class InventoryService:
         exists = self.repository.get_server(server_id)
 
         if not exists:
-            return {
-                "message": "Server not found"
-            }, 404
+            return ApiResponse.error(
+                "Server not found",
+                404
+)
 
         self.repository.delete_server(server_id)
 
