@@ -1,0 +1,38 @@
+# Python
+
+__pycache__/
+*.pyc
+
+# Virtual Environment
+
+venv/
+.env
+
+# macOS
+
+.DS_Store
+
+# VSCode
+
+.vscode/
+
+# Logs
+
+logs/
+
+# Terraform
+
+*.tfstate
+*.tfstate.*
+
+# Docker
+
+*.log
+
+# MySQL
+
+*.sql.bak
+
+# Environment
+
+.env.local
