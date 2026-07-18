@@ -6,6 +6,10 @@ from modules.users.routes import users_bp
 
 from modules.inventory.routes import inventory_bp
 
+from modules.monitoring.routes import monitoring_bp
+
+
+
 app = Flask(__name__)
 
 CORS(app)
@@ -14,6 +18,7 @@ CORS(app)
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(inventory_bp)
+app.register_blueprint(monitoring_bp)
 
 
 @app.route("/")
