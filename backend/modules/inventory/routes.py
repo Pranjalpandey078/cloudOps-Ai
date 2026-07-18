@@ -42,3 +42,19 @@ inventory_bp.route(
     methods=["GET"]
 
 )(login_required(controller.get_one))
+inventory_bp.route(
+
+    "/<int:server_id>",
+
+    methods=["PUT"]
+
+)(login_required(controller.update))
+
+
+inventory_bp.route(
+
+    "/<int:server_id>",
+
+    methods=["DELETE"]
+
+)(login_required(controller.delete))
