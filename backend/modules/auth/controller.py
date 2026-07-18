@@ -12,3 +12,8 @@ class AuthController:
         data = request.get_json()
 
         return self.service.register(data)
+    def login(self):
+
+        data = request.get_json()
+
+        return self.service.login(data)

@@ -21,3 +21,10 @@ auth_bp.route(
     methods=["POST"]
 
 )(controller.register)
+auth_bp.route(
+
+    "/login",
+
+    methods=["POST"]
+
+)(controller.login)

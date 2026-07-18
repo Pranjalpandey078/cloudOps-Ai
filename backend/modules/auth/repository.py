@@ -52,3 +52,26 @@ class AuthRepository:
         ))
 
         connection.close()
+    def find_by_username(self, username):
+
+        connection = Database.get_connection()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+
+            """
+            SELECT *
+            FROM users
+            WHERE username=%s
+            """,
+
+            (username,)
+
+        )
+
+        user = cursor.fetchone()
+
+        connection.close()
+
+        return user
