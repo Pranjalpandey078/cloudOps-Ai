@@ -19,7 +19,21 @@ class InventoryService:
 )
     def get_all(self):
 
-        return self.repository.get_all_servers()
+        servers = self.repository.get_all_servers()
+
+        for server in servers:
+
+            for key, value in server.items():
+
+                if hasattr(value, "isoformat"):
+                    server[key] = value.isoformat()
+
+                elif hasattr(value, "quantize"):
+                    server[key] = float(value)
+
+        return ApiResponse.success(
+            data=servers
+        )
 
     def get_one(self, server_id):
 

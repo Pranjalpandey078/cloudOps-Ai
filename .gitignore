@@ -1,38 +1,52 @@
-# Python
+# Environment / secrets
+.env
+.env.*
+!.env.example
 
+# Python
+venv/
+backend/venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Virtual Environment
-
-venv/
-.env
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
 
 # macOS
-
 .DS_Store
 
-# VSCode
-
+# IDE
 .vscode/
+.idea/
 
 # Logs
-
-logs/
-
-# Terraform
-
-*.tfstate
-*.tfstate.*
-
-# Docker
-
 *.log
+logs/
+backend/logs/
 
-# MySQL
+# Backups
+*.backup
+*.backup-*
+*.bak
 
-*.sql.bak
+# Keys / certificates
+*.pem
+*.key
+*.crt
 
-# Environment
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
 
-.env.local
+# Temporary / pre-change copies
+*.before-*
+*.before_*
+
+# Python test/debug scripts used locally
+backend/test_ai.py
+*.phase1_backup

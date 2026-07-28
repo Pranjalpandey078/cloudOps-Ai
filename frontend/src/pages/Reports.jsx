@@ -1,0 +1,15 @@
+export default function Reports() {
+
+    return (
+
+        <div className="text-white p-8">
+
+            <h1 className="text-5xl font-bold">
+                Reports
+            </h1>
+
+        </div>
+
+    );
+
+}

@@ -8,3 +8,6 @@ class MonitoringController:
     def latest(self):
 
         return self.service.latest()
+    def overview(self):
+
+        return self.service.overview()

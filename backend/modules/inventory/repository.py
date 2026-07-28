@@ -60,19 +60,45 @@ class InventoryRepository:
 
         cursor.execute("""
             SELECT
-                id,
-                hostname,
-                ip_address,
-                operating_system,
-                cpu_cores,
-                memory_gb,
-                disk_gb,
-                status,
-                region,
-                cloud_provider
-            FROM servers
-            WHERE is_deleted = FALSE
-            ORDER BY hostname
+                s.id,
+                s.hostname,
+                s.ip_address,
+                s.operating_system,
+                s.cpu_cores,
+                s.memory_gb,
+                s.disk_gb,
+                s.status,
+                s.region,
+                s.cloud_provider,
+                s.discovery_source,
+                s.external_resource_id,
+                s.availability_zone,
+                s.instance_type,
+
+                e.environment_name AS environment,
+
+                lm.cpu_usage,
+                lm.memory_usage,
+                lm.disk_usage,
+                lm.collected_at
+
+            FROM servers s
+
+            LEFT JOIN environments e
+                ON e.id = s.environment_id
+
+            LEFT JOIN metrics lm
+                ON lm.id = (
+                    SELECT m.id
+                    FROM metrics m
+                    WHERE m.server_id = s.id
+                    ORDER BY m.collected_at DESC, m.id DESC
+                    LIMIT 1
+                )
+
+            WHERE s.is_deleted = FALSE
+
+            ORDER BY s.hostname
         """)
 
         data = cursor.fetchall()

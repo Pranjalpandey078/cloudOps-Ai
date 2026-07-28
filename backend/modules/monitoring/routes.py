@@ -23,3 +23,9 @@ monitoring_bp.route(
     methods=["GET"]
 
 )(login_required(controller.latest))
+monitoring_bp.route(
+    "/overview",
+    methods=["GET"]
+)(
+    login_required(controller.overview)
+)
