@@ -10,20 +10,18 @@ class Database:
     @staticmethod
     def get_connection():
 
-        return pymysql.connect(
+        config = {
+            "host": os.getenv("MYSQL_HOST"),
+            "user": os.getenv("MYSQL_USER"),
+            "password": os.getenv("MYSQL_PASSWORD"),
+            "database": os.getenv("MYSQL_DATABASE"),
+            "port": int(os.getenv("MYSQL_PORT", 3306)),
+            "cursorclass": pymysql.cursors.DictCursor,
+            "autocommit": True
+        }
 
-            host=os.getenv("MYSQL_HOST"),
+        # Managed production MySQL such as Aiven requires TLS.
+        if os.getenv("MYSQL_SSL", "false").lower() == "true":
+            config["ssl"] = {}
 
-            user=os.getenv("MYSQL_USER"),
-
-            password=os.getenv("MYSQL_PASSWORD"),
-
-            database=os.getenv("MYSQL_DATABASE"),
-
-            port=int(os.getenv("MYSQL_PORT")),
-
-            cursorclass=pymysql.cursors.DictCursor,
-
-            autocommit=True
-
-        )
+        return pymysql.connect(**config)
