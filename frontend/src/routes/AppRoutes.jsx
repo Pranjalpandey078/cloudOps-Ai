@@ -9,6 +9,7 @@ import Docker from "../pages/Docker";
 import Kubernetes from "../pages/Kubernetes";
 import Reports from "../pages/Reports";
 import Settings from "../pages/Settings";
+import Correlation from "../pages/Correlation";
 
 export default function AppRoutes() {
 
@@ -33,6 +34,8 @@ export default function AppRoutes() {
             <Route path="/reports" element={<Reports />} />
 
             <Route path="/settings" element={<Settings />} />
+
+            <Route path="/correlation" element={<Correlation />} />
 
         </Routes>
 

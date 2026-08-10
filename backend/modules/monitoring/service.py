@@ -28,6 +28,7 @@ class MonitoringService:
 
         metrics = {
             "server_id": local_server["id"],
+            "organization_id": local_server["organization_id"],
             "cpu": cpu,
             "memory": memory,
             "disk": disk
@@ -123,11 +124,35 @@ class MonitoringService:
             if not rule:
                 continue
 
-            if value >= rule["critical_threshold"]:
+            # Validate monitoring rule before evaluating it.
+            warning_threshold = float(
+                rule["warning_threshold"]
+            )
+
+            critical_threshold = float(
+                rule["critical_threshold"]
+            )
+
+            if (
+                warning_threshold < 0
+                or critical_threshold > 100
+                or warning_threshold >= critical_threshold
+            ):
+                print(
+                    f"INVALID MONITORING RULE: {metric_name} | "
+                    f"warning={warning_threshold} | "
+                    f"critical={critical_threshold}"
+                )
+                continue
+
+            if value is None:
+                continue
+
+            if value >= critical_threshold:
 
                 severity = "CRITICAL"
 
-            elif value >= rule["warning_threshold"]:
+            elif value >= warning_threshold:
 
                 severity = "HIGH"
 
@@ -141,6 +166,8 @@ class MonitoringService:
                 continue
 
             self.incident_service.create({
+
+                "organization_id": metrics["organization_id"],
 
                 "server_id": metrics["server_id"],
 
@@ -156,7 +183,11 @@ class MonitoringService:
 
                 "metric_value": value,
 
-                "threshold_value": rule["critical_threshold"]
+                "threshold_value": (
+                    critical_threshold
+                    if severity == "CRITICAL"
+                    else warning_threshold
+                )
 
             })
 

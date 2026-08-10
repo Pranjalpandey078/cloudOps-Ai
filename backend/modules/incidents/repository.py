@@ -96,7 +96,7 @@ class IncidentRepository:
             (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (
-                1,
+                data["organization_id"],
                 data["server_id"],
                 data["title"],
                 data["description"],
@@ -140,6 +140,135 @@ class IncidentRepository:
 
         return incident
 
+    def correlate_incident(self, incident_id, data):
+
+        connection = Database.get_connection()
+        cursor = connection.cursor(DictCursor)
+
+        cursor.execute(
+            """
+            UPDATE incidents
+            SET
+                occurrence_count = occurrence_count + 1,
+                metric_value = %s,
+                threshold_value = %s,
+                severity = CASE
+                    WHEN severity = 'CRITICAL'
+                        THEN 'CRITICAL'
+                    WHEN %s = 'CRITICAL'
+                        THEN 'CRITICAL'
+                    ELSE %s
+                END,
+                description = %s,
+                last_detected_at = NOW()
+            WHERE id = %s
+            """,
+            (
+                data["metric_value"],
+                data["threshold_value"],
+                data["severity"],
+                data["severity"],
+                data["description"],
+                incident_id
+            )
+        )
+
+        connection.commit()
+
+        cursor.execute(
+            """
+            SELECT *
+            FROM incidents
+            WHERE id = %s
+            """,
+            (incident_id,)
+        )
+
+        incident = cursor.fetchone()
+
+        connection.close()
+
+        return incident
+
+
+
+
+
+    def get_by_id(self, incident_id):
+
+        connection = Database.get_connection()
+        cursor = connection.cursor(DictCursor)
+
+        cursor.execute(
+            """
+            SELECT *
+            FROM incidents
+            WHERE id = %s
+            """,
+            (incident_id,)
+        )
+
+        incident = cursor.fetchone()
+
+        connection.close()
+
+        return incident
+
+
+    def update_ai_retry_count(
+        self,
+        incident_id,
+        retry_count
+    ):
+
+        connection = Database.get_connection()
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            UPDATE incidents
+            SET ai_retry_count = %s
+            WHERE id = %s
+            """,
+            (
+                retry_count,
+                incident_id
+            )
+        )
+
+        connection.commit()
+        connection.close()
+
+
+    def update_ai_status(
+        self,
+        incident_id,
+        status,
+        error=None
+    ):
+
+        connection = Database.get_connection()
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            UPDATE incidents
+            SET
+                ai_status = %s,
+                ai_error = %s
+            WHERE id = %s
+            """,
+            (
+                status,
+                error,
+                incident_id
+            )
+        )
+
+        connection.commit()
+        connection.close()
+
+
     def latest_incidents(self):
 
         connection = Database.get_connection()
@@ -161,6 +290,9 @@ class IncidentRepository:
                 i.metric_value,
                 i.threshold_value,
                 i.ai_analysis,
+                i.ai_status,
+                i.ai_retry_count,
+                i.ai_error,
                 i.created_at,
                 i.resolved_at
             FROM incidents i
@@ -177,7 +309,105 @@ class IncidentRepository:
 
         connection.close()
 
+        # PyMySQL returns MySQL JSON columns as strings.
+        # Convert ai_analysis into a native Python object
+        # before returning incidents to the API layer.
+        for incident in data:
+
+            ai_analysis = incident.get(
+                "ai_analysis"
+            )
+
+            if isinstance(ai_analysis, str):
+
+                try:
+                    incident["ai_analysis"] = (
+                        json.loads(ai_analysis)
+                    )
+
+                except json.JSONDecodeError:
+
+                    # Preserve API stability if legacy or
+                    # malformed data exists in the column.
+                    incident["ai_analysis"] = None
+
         return data
+
+
+    def get_related_incidents(
+        self,
+        incident_id
+    ):
+
+        connection = Database.get_connection()
+
+        cursor = connection.cursor(
+            DictCursor
+        )
+
+        cursor.execute(
+            """
+            SELECT
+                i.id,
+                i.title,
+                i.severity,
+                i.status,
+                i.metric_name,
+                i.created_at
+            FROM incidents i
+
+            WHERE
+
+                i.id <> %s
+
+                AND
+
+                (
+
+                    i.server_id = (
+                        SELECT server_id
+                        FROM incidents
+                        WHERE id=%s
+                    )
+
+                    OR
+
+                    i.metric_name = (
+                        SELECT metric_name
+                        FROM incidents
+                        WHERE id=%s
+                    )
+
+                    OR
+
+                    i.organization_id = (
+                        SELECT organization_id
+                        FROM incidents
+                        WHERE id=%s
+                    )
+
+                )
+
+            ORDER BY
+                i.created_at DESC
+
+            LIMIT 10
+            """,
+            (
+                incident_id,
+                incident_id,
+                incident_id,
+                incident_id
+            )
+        )
+
+        data = cursor.fetchall()
+
+        connection.close()
+
+        return data
+
+
 
     def resolve_incident(self, incident_id):
 

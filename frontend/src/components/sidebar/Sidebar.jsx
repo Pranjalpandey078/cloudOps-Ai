@@ -7,7 +7,8 @@ import {
     FiBox,
     FiCloud,
     FiBarChart2,
-    FiSettings
+    FiSettings,
+    FiGitMerge
 } from "react-icons/fi";
 
 import { NavLink } from "react-router-dom";
@@ -29,6 +30,8 @@ const menu = [
     { title: "Kubernetes", icon: <FiCloud />, path: "/kubernetes" },
 
     { title: "Reports", icon: <FiBarChart2 />, path: "/reports" },
+
+    { title: "Correlation", icon: <FiGitMerge />, path: "/correlation" },
 
     { title: "Settings", icon: <FiSettings />, path: "/settings" }
 

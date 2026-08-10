@@ -55,8 +55,26 @@ incidents_bp.route(
 
 
 incidents_bp.route(
+    "/<int:incident_id>/related",
+    methods=["GET"]
+)(
+    login_required(
+        controller.get_related_incidents
+    )
+)
+
+
+incidents_bp.route(
     "/<int:incident_id>/chat",
     methods=["POST"]
 )(
     login_required(controller.chat)
 )
+
+incidents_bp.route(
+    "/<int:incident_id>/ai/retry",
+    methods=["POST"]
+)(
+    login_required(controller.retry_ai)
+)
+

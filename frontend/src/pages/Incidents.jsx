@@ -74,6 +74,33 @@ export default function Incidents() {
 
     }, [loadIncidents]);
 
+    useEffect(() => {
+
+        const hasActiveAI = incidents.some(
+            incident =>
+                incident.ai_status === "PENDING" ||
+                incident.ai_status === "PROCESSING"
+        );
+
+        if (!hasActiveAI) {
+            return;
+        }
+
+        const interval = setInterval(
+            () => {
+                loadIncidents();
+            },
+            3000
+        );
+
+        return () => {
+            clearInterval(interval);
+        };
+
+    }, [incidents, loadIncidents]);
+
+
+
     return (
 
         <div className="space-y-8">

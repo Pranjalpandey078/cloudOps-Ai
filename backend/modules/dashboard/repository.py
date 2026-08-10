@@ -63,6 +63,60 @@ class DashboardRepository:
 
         averages = cursor.fetchone()
 
+        cursor.execute("""
+            SELECT COUNT(*) total
+            FROM incidents
+        """)
+        total_incidents = cursor.fetchone()["total"]
+
+        cursor.execute("""
+            SELECT COUNT(*) completed
+            FROM incidents
+            WHERE ai_status='COMPLETED'
+        """)
+        completed_ai = cursor.fetchone()["completed"]
+
+        cursor.execute("""
+            SELECT
+                AVG(
+                    TIMESTAMPDIFF(
+                        MINUTE,
+                        created_at,
+                        resolved_at
+                    )
+                ) mttr
+            FROM incidents
+            WHERE resolved_at IS NOT NULL
+        """)
+        mttr = cursor.fetchone()["mttr"] or 0
+
+        ai_success_rate = round(
+            (
+                completed_ai /
+                total_incidents * 100
+            ) if total_incidents else 0,
+            1
+        )
+
+        infrastructure_health = max(
+            0,
+            100 - critical_incidents * 10
+        )
+
+
+
+        cursor.execute("""
+            SELECT
+                severity,
+                COUNT(*) total
+            FROM incidents
+            GROUP BY severity
+        """)
+
+        severity_distribution = cursor.fetchall()
+
+
+
         connection.close()
 
         return {
@@ -73,7 +127,16 @@ class DashboardRepository:
             "total_metrics": total_metrics,
             "cpu_avg": round(float(averages["cpu_avg"] or 0), 1),
             "memory_avg": round(float(averages["memory_avg"] or 0), 1),
-            "disk_avg": round(float(averages["disk_avg"] or 0), 1)
+            "disk_avg": round(float(averages["disk_avg"] or 0), 1),
+
+            "total_incidents": total_incidents,
+            "ai_success_rate": ai_success_rate,
+            "mttr": round(float(mttr),1),
+            "infrastructure_health":
+                infrastructure_health,
+
+            "severity_distribution":
+                severity_distribution
         }
 
     def charts(self):

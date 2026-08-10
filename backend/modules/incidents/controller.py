@@ -25,6 +25,23 @@ class IncidentController:
 
         return self.service.resolve(incident_id)
 
+
+    def get_related_incidents(
+        self,
+        incident_id
+    ):
+
+        return self.service.get_related_incidents(
+            incident_id
+        )
+
+
+    def retry_ai(self, incident_id):
+
+        return self.service.retry_ai(
+            incident_id
+        )
+
     def analyze(self):
 
         incident = request.get_json()

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
     FiX,
@@ -13,7 +13,10 @@ import {
 
 import {
     analyzeIncident,
-    resolveIncident
+    resolveIncident,
+    retryIncidentAI,
+    getIncidentTimeline,
+    getRelatedIncidents
 } from "../../services/incidentService";
 
 import IncidentAIChat from "./IncidentAIChat";
@@ -116,8 +119,20 @@ export default function IncidentDetailsModal({
     );
 
     const [analyzing, setAnalyzing] = useState(false);
+    const [retryingAI, setRetryingAI] = useState(false);
     const [resolving, setResolving] = useState(false);
     const [error, setError] = useState("");
+
+    const [timeline, setTimeline] = useState([]);
+    const [timelineLoading, setTimelineLoading] = useState(false);
+
+    const [relatedIncidents, setRelatedIncidents] = useState([]);
+    const [relatedLoading, setRelatedLoading] = useState(false);
+
+
+    const [elapsedTime, setElapsedTime] = useState("");
+
+
 
     if (!incident) {
         return null;
@@ -184,6 +199,43 @@ export default function IncidentDetailsModal({
     }
 
 
+    async function handleRetryAI() {
+
+        try {
+
+            setRetryingAI(true);
+            setError("");
+
+            await retryIncidentAI(
+                incident.id
+            );
+
+            if (onUpdated) {
+                await onUpdated();
+            }
+
+            onClose();
+
+        } catch (err) {
+
+            console.error(
+                "AI retry failed:",
+                err
+            );
+
+            setError(
+                err.response?.data?.message ||
+                "Failed to retry AI analysis."
+            );
+
+        } finally {
+
+            setRetryingAI(false);
+
+        }
+    }
+
+
     async function handleResolve() {
 
         try {
@@ -216,7 +268,143 @@ export default function IncidentDetailsModal({
     }
 
 
+
+    useEffect(() => {
+
+
+        async function loadRelatedIncidents() {
+
+            try {
+
+                setRelatedLoading(true);
+
+                const items =
+                    await getRelatedIncidents(
+                        incident.id
+                    );
+
+                setRelatedIncidents(items);
+
+            } catch (error) {
+
+                console.error(
+                    "Related incidents failed:",
+                    error
+                );
+
+            } finally {
+
+                setRelatedLoading(false);
+
+            }
+
+        }
+
+        async function loadTimeline() {
+
+            try {
+
+                setTimelineLoading(true);
+
+                const events =
+                    await getIncidentTimeline(
+                        incident.id
+                    );
+
+                setTimeline(events);
+
+            } catch (error) {
+
+                console.error(
+                    "Timeline load failed:",
+                    error
+                );
+
+            } finally {
+
+                setTimelineLoading(false);
+
+            }
+
+        }
+
+        if (incident?.id) {
+            loadTimeline();
+            loadRelatedIncidents();
+        }
+
+    }, [incident]);
+
+
+
+    useEffect(() => {
+
+        function updateTimer() {
+
+            const start = new Date(incident.created_at);
+
+            const diff =
+                Math.max(
+                    0,
+                    Date.now() - start.getTime()
+                );
+
+            const hours =
+                String(
+                    Math.floor(diff / 3600000)
+                ).padStart(2,"0");
+
+            const minutes =
+                String(
+                    Math.floor(diff % 3600000 / 60000)
+                ).padStart(2,"0");
+
+            const seconds =
+                String(
+                    Math.floor(diff % 60000 / 1000)
+                ).padStart(2,"0");
+
+            setElapsedTime(
+                `${hours}h ${minutes}m ${seconds}s`
+            );
+
+        }
+
+        updateTimer();
+
+        const timer =
+            setInterval(updateTimer,1000);
+
+        return () => clearInterval(timer);
+
+    }, [incident.created_at]);
+
     const resolved = incident.status === "RESOLVED";
+
+    const aiStatus =
+        incident.ai_status || "PENDING";
+
+    const aiPending =
+        aiStatus === "PENDING";
+
+    const aiProcessing =
+        aiStatus === "PROCESSING";
+
+    const aiFailed =
+        aiStatus === "FAILED";
+
+    const aiCompleted =
+        aiStatus === "COMPLETED";
+
+    const healthScore =
+        incident.severity === "CRITICAL"
+            ? 20
+            : incident.severity === "HIGH"
+            ? 45
+            : incident.severity === "MEDIUM"
+            ? 70
+            : 95;
+
 
     return (
 
@@ -435,6 +623,109 @@ export default function IncidentDetailsModal({
                     </div>
 
 
+                    {/* Enterprise Impact */}
+
+                    <div
+                        className="
+                            rounded-2xl
+                            bg-white/5
+                            border
+                            border-white/10
+                            p-6
+                        "
+                    >
+
+                        <div className="flex items-center gap-2 mb-5">
+
+                            <FiServer className="text-cyan-400" />
+
+                            <h3 className="font-bold">
+                                Affected Resources
+                            </h3>
+
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-5">
+
+                            <div>
+
+                                <div className="text-xs text-slate-500">
+                                    Server
+                                </div>
+
+                                <div className="font-semibold mt-1">
+                                    {incident.server_hostname || "Unknown"}
+                                </div>
+
+                            </div>
+
+                            <div>
+
+                                <div className="text-xs text-slate-500">
+                                    Metric
+                                </div>
+
+                                <div className="font-semibold mt-1">
+                                    {incident.metric_name}
+                                </div>
+
+                            </div>
+
+                            <div>
+
+                                <div className="text-xs text-slate-500">
+                                    Severity
+                                </div>
+
+                                <div className="font-semibold text-red-400 mt-1">
+                                    {incident.severity}
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div
+                            className="
+                                mt-6
+                                rounded-xl
+                                border
+                                border-white/10
+                                bg-black/20
+                                p-5
+                            "
+                        >
+
+                            <div className="text-xs text-slate-500">
+                                Infrastructure Health
+                            </div>
+
+                            <div
+                                className={
+                                    healthScore >= 90
+                                        ? "mt-2 text-4xl font-bold text-green-400"
+                                        : healthScore >= 70
+                                        ? "mt-2 text-4xl font-bold text-yellow-400"
+                                        : "mt-2 text-4xl font-bold text-red-400"
+                                }
+                            >
+                                {healthScore}%
+                            </div>
+
+                            <div className="mt-2 text-sm text-slate-400">
+                                {healthScore >= 90
+                                    ? "Infrastructure operating normally."
+                                    : healthScore >= 70
+                                    ? "Minor degradation detected."
+                                    : "Immediate attention recommended."}
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
                     {/* Timeline */}
 
                     <div
@@ -457,33 +748,228 @@ export default function IncidentDetailsModal({
 
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-6">
+                        {timelineLoading ? (
 
-                            <div>
+                            <div className="text-center py-8 text-slate-400">
+                                Loading timeline...
+                            </div>
 
-                                <p className="text-xs text-slate-500">
-                                    Detected
-                                </p>
+                        ) : timeline.length === 0 ? (
 
-                                <p className="font-semibold mt-1">
-                                    {formatDate(incident.created_at)}
-                                </p>
+                            <div className="text-center py-8 text-slate-500">
+                                No timeline events available.
+                            </div>
+
+                        ) : (
+
+                            <div className="space-y-6">
+
+                                {timeline.map((event, index) => (
+
+                                    <div
+                                        key={event.id}
+                                        className="flex gap-4"
+                                    >
+
+                                        <div
+                                            className="
+                                                flex
+                                                flex-col
+                                                items-center
+                                            "
+                                        >
+
+                                            <div
+                                                className="
+                                                    w-3
+                                                    h-3
+                                                    rounded-full
+                                                    bg-cyan-400
+                                                "
+                                            />
+
+                                            {index !== timeline.length - 1 && (
+
+                                                <div
+                                                    className="
+                                                        w-px
+                                                        flex-1
+                                                        bg-white/10
+                                                        mt-2
+                                                    "
+                                                />
+
+                                            )}
+
+                                        </div>
+
+                                        <div className="flex-1 pb-5">
+
+                                            <div
+                                                className="
+                                                    flex
+                                                    items-center
+                                                    justify-between
+                                                    gap-3
+                                                "
+                                            >
+
+                                                <h4
+                                                    className="
+                                                        font-semibold
+                                                        text-white
+                                                    "
+                                                >
+                                                    {event.title}
+                                                </h4>
+
+                                                <span
+                                                    className="
+                                                        text-xs
+                                                        text-slate-500
+                                                    "
+                                                >
+                                                    {formatDate(event.created_at)}
+                                                </span>
+
+                                            </div>
+
+                                            <div
+                                                className="
+                                                    text-xs
+                                                    uppercase
+                                                    tracking-wider
+                                                    text-cyan-400
+                                                    mt-1
+                                                "
+                                            >
+                                                {event.event_type}
+                                            </div>
+
+                                            {event.description && (
+
+                                                <p
+                                                    className="
+                                                        mt-2
+                                                        text-sm
+                                                        text-slate-400
+                                                    "
+                                                >
+                                                    {event.description}
+                                                </p>
+
+                                            )}
+
+                                        </div>
+
+                                    </div>
+
+                                ))}
 
                             </div>
 
-                            <div>
+                        )}
 
-                                <p className="text-xs text-slate-500">
-                                    Resolved
-                                </p>
+                    </div>
 
-                                <p className="font-semibold mt-1">
-                                    {formatDate(incident.resolved_at)}
-                                </p>
 
-                            </div>
+                    {/* Related Incidents */}
+
+                    <div
+                        className="
+                            rounded-2xl
+                            border
+                            border-white/10
+                            bg-white/5
+                            p-6
+                            mb-6
+                        "
+                    >
+
+                        <div className="flex items-center justify-between mb-5">
+
+                            <h3 className="text-lg font-bold">
+                                Related Incidents
+                            </h3>
+
+                            <span className="text-xs text-slate-500">
+                                {relatedIncidents.length} found
+                            </span>
 
                         </div>
+
+                        {relatedLoading ? (
+
+                            <p className="text-slate-400">
+                                Loading related incidents...
+                            </p>
+
+                        ) : relatedIncidents.length === 0 ? (
+
+                            <p className="text-slate-500">
+                                No related incidents found.
+                            </p>
+
+                        ) : (
+
+                            <div className="space-y-3">
+
+                                {relatedIncidents.map(item => (
+
+                                    <div
+                                        key={item.id}
+                                        className="
+                                            rounded-xl
+                                            border
+                                            border-white/10
+                                            bg-black/20
+                                            p-4
+                                        "
+                                    >
+
+                                        <div className="flex justify-between">
+
+                                            <div>
+
+                                                <div className="font-semibold">
+                                                    {item.title}
+                                                </div>
+
+                                                <div className="
+                                                    text-sm
+                                                    text-slate-400
+                                                    mt-1
+                                                ">
+                                                    {item.metric_name}
+                                                </div>
+
+                                            </div>
+
+                                            <span className="
+                                                text-xs
+                                                font-bold
+                                                text-cyan-400
+                                            ">
+                                                {item.severity}
+                                            </span>
+
+                                        </div>
+
+                                        <div className="
+                                            mt-2
+                                            text-xs
+                                            text-slate-500
+                                        ">
+                                            {formatDate(item.created_at)}
+                                        </div>
+
+                                    </div>
+
+                                ))}
+
+                            </div>
+
+                        )}
 
                     </div>
 
@@ -522,28 +1008,211 @@ export default function IncidentDetailsModal({
 
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={handleAnalyze}
-                                disabled={analyzing}
-                                className="
-                                    px-5
-                                    py-3
-                                    rounded-xl
-                                    bg-cyan-400
-                                    text-slate-950
-                                    font-bold
-                                    hover:bg-cyan-300
-                                    disabled:opacity-50
-                                    transition
-                                "
-                            >
-                                {analyzing
-                                    ? "Analyzing..."
-                                    : "Analyze with AI"}
-                            </button>
+                            {aiFailed ? (
+
+                                <button
+                                    type="button"
+                                    onClick={handleRetryAI}
+                                    disabled={retryingAI}
+                                    className="
+                                        px-5
+                                        py-3
+                                        rounded-xl
+                                        bg-red-500
+                                        text-white
+                                        font-bold
+                                        hover:bg-red-400
+                                        disabled:opacity-50
+                                        transition
+                                    "
+                                >
+                                    {retryingAI
+                                        ? "Retrying..."
+                                        : "Retry AI Analysis"}
+                                </button>
+
+                            ) : aiPending ? (
+
+                                <span className="
+                                    text-sm
+                                    font-semibold
+                                    text-yellow-400
+                                ">
+                                    AI analysis pending
+                                </span>
+
+                            ) : aiProcessing ? (
+
+                                <span className="
+                                    text-sm
+                                    font-semibold
+                                    text-cyan-400
+                                ">
+                                    AI analysis processing...
+                                </span>
+
+                            ) : (
+
+                                <button
+                                    type="button"
+                                    onClick={handleAnalyze}
+                                    disabled={analyzing}
+                                    className="
+                                        px-5
+                                        py-3
+                                        rounded-xl
+                                        bg-cyan-400
+                                        text-slate-950
+                                        font-bold
+                                        hover:bg-cyan-300
+                                        disabled:opacity-50
+                                        transition
+                                    "
+                                >
+                                    {analyzing
+                                        ? "Analyzing..."
+                                        : aiCompleted
+                                            ? "Re-analyze"
+                                            : "Analyze with AI"}
+                                </button>
+
+                            )}
 
                         </div>
+
+                        <div
+                            className="
+                                mb-5
+                                rounded-2xl
+                                border
+                                border-cyan-500/20
+                                bg-cyan-500/5
+                                p-5
+                            "
+                        >
+
+                            <div
+                                className="
+                                    grid
+                                    md:grid-cols-4
+                                    gap-4
+                                "
+                            >
+
+                                <div>
+
+                                    <div className="text-xs text-slate-500">
+                                        AI Status
+                                    </div>
+
+                                    <div className="mt-1 font-bold text-cyan-400">
+                                        {incident.ai_status || "PENDING"}
+                                    </div>
+
+                                </div>
+
+                                <div>
+
+                                    <div className="text-xs text-slate-500">
+                                        Confidence
+                                    </div>
+
+                                    <div className="mt-1 font-bold">
+                                        {analysis?.analysis?.confidence
+                                            ? `${Math.round(
+                                                analysis.analysis.confidence * 100
+                                            )}%`
+                                            : "N/A"}
+                                    </div>
+
+                                </div>
+
+                                <div>
+
+                                    <div className="text-xs text-slate-500">
+                                        Retry Count
+                                    </div>
+
+                                    <div className="mt-1 font-bold">
+                                        {incident.ai_retry_count ?? 0}
+                                    </div>
+
+                                </div>
+
+                                <div>
+
+                                    <div className="text-xs text-slate-500">
+                                        Recommendation
+                                    </div>
+
+                                    <div
+                                        className={
+                                            analysis?.analysis?.confidence >= 0.9
+                                                ? "mt-1 font-bold text-green-400"
+                                                : analysis?.analysis?.confidence >= 0.7
+                                                ? "mt-1 font-bold text-yellow-400"
+                                                : "mt-1 font-bold text-red-400"
+                                        }
+                                    >
+                                        {
+                                            analysis?.analysis?.confidence >= 0.9
+                                                ? "Trusted Result"
+                                                : analysis?.analysis?.confidence >= 0.7
+                                                ? "Review Recommended"
+                                                : "Manual Investigation"
+                                        }
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        {aiFailed && (
+
+                            <div
+                                className="
+                                    mb-5
+                                    rounded-xl
+                                    border
+                                    border-red-500/20
+                                    bg-red-500/10
+                                    p-4
+                                "
+                            >
+                                <div className="
+                                    flex
+                                    items-center
+                                    gap-2
+                                    text-red-400
+                                    font-bold
+                                ">
+                                    <FiAlertTriangle />
+                                    AI processing failed
+                                </div>
+
+                                <p className="
+                                    text-sm
+                                    text-slate-400
+                                    mt-2
+                                ">
+                                    {incident.ai_error ||
+                                        "The AI provider could not complete the analysis."}
+                                </p>
+
+                                <p className="
+                                    text-xs
+                                    text-slate-500
+                                    mt-2
+                                ">
+                                    Attempts: {incident.ai_retry_count ?? 0}
+                                </p>
+
+                            </div>
+
+                        )}
 
                         {analysis ? (
 

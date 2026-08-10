@@ -19,6 +19,8 @@ from modules.ai.routes import ai_bp
 from modules.notifications.routes import notifications_bp
 from modules.remediation.routes import remediation_bp
 from modules.discovery.routes import discovery_bp
+from modules.timeline.routes import timeline_bp
+from modules.correlation.routes import routes as correlation_bp
 
 
 app = Flask(__name__)
@@ -50,6 +52,8 @@ app.register_blueprint(deployments_bp)
 app.register_blueprint(notifications_bp)
 app.register_blueprint(remediation_bp)
 app.register_blueprint(discovery_bp)
+app.register_blueprint(timeline_bp)
+app.register_blueprint(correlation_bp)
 
 
 @app.route("/")

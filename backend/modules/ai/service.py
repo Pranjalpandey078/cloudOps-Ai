@@ -1,3 +1,5 @@
+import json
+
 from modules.ai.factory import AIProviderFactory
 
 
@@ -23,9 +25,70 @@ class AIService:
 
     def analyze_incident(self, incident):
 
-        analysis = self.provider.analyze_incident(
+        raw_analysis = self.provider.analyze_incident(
             incident
         )
+
+        if isinstance(raw_analysis, dict):
+            analysis = raw_analysis
+        else:
+            try:
+                analysis = json.loads(
+                    raw_analysis.strip()
+                )
+            except (
+                json.JSONDecodeError,
+                AttributeError
+            ) as error:
+                raise ValueError(
+                    "AI provider returned invalid JSON analysis"
+                ) from error
+
+        required_fields = {
+            "root_cause",
+            "impact",
+            "severity_assessment",
+            "recommended_actions",
+            "prevention_steps",
+            "confidence"
+        }
+
+        missing_fields = (
+            required_fields - set(analysis.keys())
+        )
+
+        if missing_fields:
+            raise ValueError(
+                "AI analysis missing required fields: "
+                + ", ".join(sorted(missing_fields))
+            )
+
+        if not isinstance(
+            analysis["recommended_actions"],
+            list
+        ):
+            raise ValueError(
+                "recommended_actions must be a list"
+            )
+
+        if not isinstance(
+            analysis["prevention_steps"],
+            list
+        ):
+            raise ValueError(
+                "prevention_steps must be a list"
+            )
+
+        confidence = analysis["confidence"]
+
+        if (
+            not isinstance(confidence, (int, float))
+            or isinstance(confidence, bool)
+            or not 0.0 <= confidence <= 1.0
+        ):
+            raise ValueError(
+                "confidence must be between 0.0 and 1.0"
+            )
 
         return {
             "analysis": analysis

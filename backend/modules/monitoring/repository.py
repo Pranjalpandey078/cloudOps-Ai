@@ -194,35 +194,8 @@ class MonitoringRepository:
                 """
                 SELECT
                     id,
-                    hostname
-                FROM servers
-                WHERE discovery_source = 'LINUX'
-                  AND is_deleted = FALSE
-                ORDER BY updated_at DESC
-                LIMIT 1
-                """
-            )
-
-            return cursor.fetchone()
-
-        finally:
-
-            connection.close()
-
-
-    def get_local_discovered_server(self):
-
-        connection = Database.get_connection()
-
-        try:
-
-            cursor = connection.cursor(DictCursor)
-
-            cursor.execute(
-                """
-                SELECT
-                    id,
-                    hostname
+                    hostname,
+                    organization_id
                 FROM servers
                 WHERE discovery_source = 'LINUX'
                   AND is_deleted = FALSE

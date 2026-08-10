@@ -35,7 +35,9 @@ class OllamaProvider(AIProvider):
         prompt = f"""
 You are a Senior Cloud DevOps Engineer and Site Reliability Engineer.
 
-Analyze this production incident.
+Analyze the following production infrastructure incident.
+
+INCIDENT DETAILS
 
 Server ID: {incident["server_id"]}
 Title: {incident["title"]}
@@ -45,12 +47,38 @@ Metric: {incident["metric_name"]}
 Current Value: {incident["metric_value"]}
 Threshold: {incident["threshold_value"]}
 
-Provide:
+Return ONLY valid JSON.
 
-1. Root Cause
-2. Business Impact
-3. Recommendations
-4. Priority
+Do not use markdown.
+Do not use backticks.
+Do not include text before or after the JSON.
+
+Use exactly this structure:
+
+{{
+  "root_cause": "Most likely technical cause of the incident",
+  "impact": "Likely infrastructure or business impact",
+  "severity_assessment": "Assessment of the current severity",
+  "recommended_actions": [
+    "First recommended action",
+    "Second recommended action",
+    "Third recommended action"
+  ],
+  "prevention_steps": [
+    "First prevention step",
+    "Second prevention step"
+  ],
+  "confidence": 0.85
+}}
+
+RULES:
+
+1. Base the analysis only on the incident information provided.
+2. Do not claim certainty when the root cause cannot be proven.
+3. confidence must be a number between 0.0 and 1.0.
+4. recommended_actions must contain practical DevOps/SRE actions.
+5. prevention_steps must contain long-term preventive measures.
+6. Return valid JSON only.
 """
 
         return self.generate(prompt)

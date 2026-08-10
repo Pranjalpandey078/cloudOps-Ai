@@ -47,6 +47,29 @@ export default function IncidentTable({
         return "text-red-400";
     }
 
+    function aiStatusStyle(status) {
+
+        switch (status) {
+
+            case "COMPLETED":
+                return "text-green-400";
+
+            case "PROCESSING":
+                return "text-cyan-400";
+
+            case "PENDING":
+                return "text-yellow-400";
+
+            case "FAILED":
+                return "text-red-400";
+
+            default:
+                return "text-slate-400";
+        }
+    }
+
+
+
     function metricValue(value) {
 
         if (
@@ -148,6 +171,7 @@ export default function IncidentTable({
                             <th>Observed</th>
                             <th>Threshold</th>
                             <th>Status</th>
+                            <th>AI</th>
                             <th>Created</th>
                             <th>Actions</th>
 
@@ -162,7 +186,7 @@ export default function IncidentTable({
                             <tr>
 
                                 <td
-                                    colSpan="10"
+                                    colSpan="11"
                                     className="p-10 text-center text-slate-400"
                                 >
                                     Loading incidents...
@@ -175,7 +199,7 @@ export default function IncidentTable({
                             <tr>
 
                                 <td
-                                    colSpan="10"
+                                    colSpan="11"
                                     className="p-12 text-center"
                                 >
 
@@ -317,6 +341,22 @@ export default function IncidentTable({
                                             `}
                                         >
                                             ● {incident.status || "OPEN"}
+                                        </span>
+
+                                    </td>
+
+                                    <td>
+
+                                        <span
+                                            className={`
+                                                text-xs
+                                                font-bold
+                                                ${aiStatusStyle(
+                                                    incident.ai_status
+                                                )}
+                                            `}
+                                        >
+                                            ● {incident.ai_status || "PENDING"}
                                         </span>
 
                                     </td>

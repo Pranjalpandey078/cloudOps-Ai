@@ -93,3 +93,50 @@ export async function chatWithIncident(
 
     return response.data.data || response.data;
 }
+
+
+// Retry asynchronous AI analysis
+export async function retryIncidentAI(incidentId) {
+
+    const response = await API.post(
+        `/api/incidents/${incidentId}/ai/retry`,
+        {},
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    return response.data.data || response.data;
+}
+
+
+// Retry asynchronous AI analysis
+
+export async function getIncidentTimeline(
+    incidentId
+) {
+
+    const response = await API.get(
+        `/api/incidents/${incidentId}/timeline`,
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    return response.data.data || [];
+}
+
+export async function getRelatedIncidents(
+    incidentId
+) {
+
+    const response = await API.get(
+        `/api/incidents/${incidentId}/related`,
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    return response.data.data || [];
+}
+

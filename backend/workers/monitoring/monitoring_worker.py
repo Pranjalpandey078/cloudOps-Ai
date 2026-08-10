@@ -1,26 +1,19 @@
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from flask import Flask
+
 from modules.monitoring.service import MonitoringService
 
 
 scheduler = BlockingScheduler()
 
-
 service = MonitoringService()
 
 
-
-@scheduler.scheduled_job(
-    "interval",
-    seconds=10
-)
-def collect():
+def run_monitoring_cycle():
 
     print()
-    print(
-        "===== MONITORING CYCLE START ====="
-    )
-
+    print("===== MONITORING CYCLE START =====")
 
     # Local machine monitoring
     try:
@@ -38,8 +31,6 @@ def collect():
             error
         )
 
-
-
     # AWS CloudWatch monitoring
     try:
 
@@ -51,7 +42,6 @@ def collect():
             "servers"
         )
 
-
     except Exception as error:
 
         print(
@@ -59,11 +49,25 @@ def collect():
             error
         )
 
-
     print(
         "===== MONITORING CYCLE END ====="
     )
 
+
+def collect():
+
+    from run import app
+
+    with app.app_context():
+
+        run_monitoring_cycle()
+
+
+scheduler.add_job(
+    collect,
+    "interval",
+    seconds=10
+)
 
 
 if __name__ == "__main__":
