@@ -56,6 +56,13 @@ app.register_blueprint(timeline_bp)
 app.register_blueprint(correlation_bp)
 
 
+@app.route("/api/health")
+def health():
+    return {
+        "status": "healthy"
+    }
+
+
 @app.route("/")
 def home():
     return {

@@ -4,7 +4,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends procps \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app:3.13-slim
 
 WORKDIR /app
 
