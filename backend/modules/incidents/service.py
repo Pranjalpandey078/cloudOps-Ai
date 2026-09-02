@@ -6,6 +6,8 @@ from core.socketio import emit_incident
 from workers.ai.incident_ai_worker import IncidentAIWorker
 from modules.timeline.service import TimelineService
 from modules.correlation.repository import CorrelationRepository
+from modules.audit.repository import AuditRepository
+from modules.monitoring.evidence_repository import EvidenceRepository
 
 
 class IncidentService:
@@ -14,6 +16,8 @@ class IncidentService:
     notification_service = NotificationService()
     ai_service = AIService()
     correlation_repository = CorrelationRepository()
+    audit_repository = AuditRepository()
+    evidence_repository = EvidenceRepository()
 
     
     def recent(self):
@@ -119,7 +123,73 @@ class IncidentService:
             )
 
 
-    def create(self, data):
+    def remediation(
+        self,
+        incident_id,
+        user_id=None,
+        ip_address=None
+    ):
+
+        incident = self.repository.get_incident(
+            incident_id
+        )
+
+        if not incident:
+            return ApiResponse.error(
+                "Incident not found",
+                404
+            )
+
+        try:
+            remediation_result = (
+                self.ai_service.generate_remediation(
+                    incident
+                )
+            )
+
+            remediation = (
+                remediation_result.get("remediation")
+                if isinstance(remediation_result, dict)
+                else remediation_result
+            )
+
+            self.audit_repository.create(
+                user_id=user_id,
+                module_name="incidents",
+                action="AI_REMEDIATION_GENERATED",
+                resource_id=incident_id,
+                old_value={
+                    "severity": incident.get("severity"),
+                    "metric_name": incident.get("metric_name"),
+                    "metric_value": incident.get("metric_value"),
+                    "threshold_value": incident.get("threshold_value")
+                },
+                new_value={
+                    "remediation": remediation
+                },
+                ip_address=ip_address
+            )
+
+            return ApiResponse.success(
+                message="AI remediation generated successfully",
+                data={
+                    "incident_id": incident_id,
+                    "remediation": remediation
+                }
+            )
+
+        except Exception as error:
+
+            print(
+                f"AI remediation generation failed: {error}"
+            )
+
+            return ApiResponse.error(
+                "AI remediation generation failed",
+                500
+            )
+
+    def create(self, data, evidence=None):
 
         exists = self.repository.get_open_incident(
             data["server_id"],
@@ -238,6 +308,17 @@ class IncidentService:
         # =========================================================
 
         incident_id = self.repository.create_incident(data)
+
+        # Store the evidence snapshot before AI processing starts.
+        # This guarantees the AI worker can reason over the same
+        # evidence that triggered the incident.
+        if evidence:
+            self.evidence_repository.create(
+                incident_id=incident_id,
+                server_id=data["server_id"],
+                evidence_type="THRESHOLD_BREACH",
+                evidence_data=evidence
+            )
 
         confidence_score = 100
 

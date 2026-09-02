@@ -1,31 +1,37 @@
 from flask import Blueprint
 
+from modules.monitoring.controller import MonitoringController
 from shared.auth_middleware import login_required
 
-from modules.monitoring.controller import MonitoringController
 
 monitoring_bp = Blueprint(
-
     "monitoring",
-
     __name__,
-
     url_prefix="/api/monitoring"
-
 )
 
 controller = MonitoringController()
 
+
 monitoring_bp.route(
-
     "/latest",
-
     methods=["GET"]
+)(
+    login_required(controller.latest)
+)
 
-)(login_required(controller.latest))
+
 monitoring_bp.route(
     "/overview",
     methods=["GET"]
 )(
     login_required(controller.overview)
+)
+
+
+monitoring_bp.route(
+    "/ingest",
+    methods=["POST"]
+)(
+    controller.ingest
 )

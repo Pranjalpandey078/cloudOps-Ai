@@ -3,6 +3,12 @@ from shared.response import ApiResponse
 from modules.remediation.repository import RemediationRepository
 from modules.remediation.safety import RemediationSafetyValidator
 from modules.remediation.executor import RemediationExecutor
+from modules.remediation.verification_repository import RemediationVerificationRepository
+from modules.remediation.verification_service import RemediationVerificationService
+from modules.incidents.repository import IncidentRepository
+from modules.timeline.service import TimelineService
+from modules.audit.repository import AuditRepository
+from modules.correlation.repository import CorrelationRepository
 
 
 class RemediationService:
@@ -11,6 +17,12 @@ class RemediationService:
 
     repository = RemediationRepository()
     validator = RemediationSafetyValidator()
+    verification_repository = RemediationVerificationRepository()
+    verification_service = RemediationVerificationService()
+    incident_repository = IncidentRepository()
+    timeline_service = TimelineService()
+    audit_repository = AuditRepository()
+    correlation_repository = CorrelationRepository()
 
 
     def request_execution(self, data, user_id):
@@ -217,6 +229,36 @@ class RemediationService:
             data=execution
         )
 
+    def get_verification(self, execution_id):
+
+        execution = self.repository.get_by_id(
+            execution_id
+        )
+
+        if not execution:
+            return ApiResponse.error(
+                "Remediation execution not found",
+                404
+            )
+
+        verification = (
+            self.verification_repository
+            .get_latest_for_execution(
+                execution_id
+            )
+        )
+
+        if not verification:
+            return ApiResponse.success(
+                message="No verification has been recorded yet.",
+                data=None
+            )
+
+        return ApiResponse.success(
+            data=verification
+        )
+
+
     def execute(self, execution_id):
 
         execution = self.repository.get_by_id(
@@ -229,13 +271,11 @@ class RemediationService:
                 404
             )
 
-
         if execution["execution_status"] != "APPROVED":
             return ApiResponse.error(
                 "Only approved remediation can be executed",
                 400
             )
-
 
         # Revalidate immediately before execution.
         validation = self.validator.validate(
@@ -249,7 +289,6 @@ class RemediationService:
                 400
             )
 
-
         # Atomic state transition:
         # APPROVED -> RUNNING
         changed = self.repository.mark_running(
@@ -262,12 +301,10 @@ class RemediationService:
                 409
             )
 
-
         result = self.executor.execute(
             execution["execution_type"],
             execution["command_text"]
         )
-
 
         if not result.get("allowed"):
 
@@ -282,10 +319,6 @@ class RemediationService:
                 )
             )
 
-            updated = self.repository.get_by_id(
-                execution_id
-            )
-
             return ApiResponse.error(
                 result.get(
                     "reason",
@@ -294,13 +327,11 @@ class RemediationService:
                 400
             )
 
-
         final_status = (
             "SUCCESS"
             if result.get("success")
             else "FAILED"
         )
-
 
         self.repository.complete_execution(
             execution_id,
@@ -310,11 +341,132 @@ class RemediationService:
             result.get("stderr", "")
         )
 
-
         updated = self.repository.get_by_id(
             execution_id
         )
 
+        # Verification only follows a successful execution.
+        if final_status == "SUCCESS":
+
+            incident = self.repository.get_incident(
+                execution["incident_id"]
+            )
+
+            if incident and incident.get("metric_name"):
+
+                verification_id = (
+                    self.verification_repository.create(
+                        execution_id=execution_id,
+                        incident_id=incident["id"],
+                        server_id=incident.get("server_id"),
+                        metric_name=incident["metric_name"],
+                        before_value=incident.get(
+                            "metric_value"
+                        ),
+                        threshold_value=incident.get(
+                            "threshold_value"
+                        )
+                    )
+                )
+
+                verification = (
+                    self.verification_service.verify(
+                        execution,
+                        incident
+                    )
+                )
+
+                self.verification_repository.complete(
+                    verification_id=verification_id,
+                    status=verification["status"],
+                    after_value=verification["after_value"],
+                    evidence_data=verification["evidence"],
+                    message=verification["message"]
+                )
+
+                # Resolve only after three consecutive
+                # healthy samples.
+                if verification["status"] == "RECOVERED":
+
+                    incident_id = incident["id"]
+
+                    previous_status = incident.get(
+                        "status"
+                    )
+
+                    self.incident_repository.resolve_incident(
+                        incident_id
+                    )
+
+                    group_id = (
+                        self.correlation_repository
+                        .get_group_by_incident(
+                            incident_id
+                        )
+                    )
+
+                    if group_id:
+                        self.correlation_repository.refresh_group_status(
+                            group_id
+                        )
+
+                    self.timeline_service.add_event(
+                        incident_id=incident_id,
+                        event_type="RECOVERY_VERIFIED",
+                        title="Recovery Verified",
+                        description=(
+                            f"{incident['metric_name']} remained "
+                            f"below the configured threshold for "
+                            f"three consecutive samples."
+                        )
+                    )
+
+                    self.audit_repository.create(
+                        user_id=execution.get("user_id"),
+                        module_name="incidents",
+                        action="INCIDENT_AUTO_RESOLVED",
+                        resource_id=incident_id,
+                        old_value={
+                            "status": previous_status
+                        },
+                        new_value={
+                            "status": "RESOLVED",
+                            "verification_id": verification_id,
+                            "metric_name": incident[
+                                "metric_name"
+                            ],
+                            "before_value": incident.get(
+                                "metric_value"
+                            ),
+                            "after_value": verification[
+                                "after_value"
+                            ],
+                            "threshold_value": incident.get(
+                                "threshold_value"
+                            )
+                        },
+                        ip_address=None
+                    )
+
+                    print(
+                        f"[RECOVERY] Incident #{incident_id} "
+                        f"automatically resolved."
+                    )
+
+                updated["verification"] = {
+                    "id": verification_id,
+                    "status": verification["status"],
+                    "before_value": incident.get(
+                        "metric_value"
+                    ),
+                    "after_value": verification[
+                        "after_value"
+                    ],
+                    "threshold_value": incident.get(
+                        "threshold_value"
+                    ),
+                    "message": verification["message"]
+                }
 
         return ApiResponse.success(
             message=(

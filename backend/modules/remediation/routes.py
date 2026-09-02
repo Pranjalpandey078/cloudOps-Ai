@@ -59,3 +59,10 @@ remediation_bp.route(
     login_required(controller.execute)
 )
 
+
+remediation_bp.route(
+    "/<int:execution_id>/verification",
+    methods=["GET"]
+)(
+    login_required(controller.get_verification)
+)

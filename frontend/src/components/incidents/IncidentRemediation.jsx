@@ -19,7 +19,8 @@ import {
     getIncidentRemediations,
     approveRemediation,
     rejectRemediation,
-    executeRemediation
+    executeRemediation,
+    getRemediationVerification
 } from "../../services/remediationService";
 
 
@@ -32,6 +33,7 @@ export default function IncidentRemediation({
     const [executions, setExecutions] = useState([]);
     const [loadingKey, setLoadingKey] = useState("");
     const [error, setError] = useState("");
+    const [verifications, setVerifications] = useState({});
 
 
     useEffect(() => {
@@ -53,6 +55,53 @@ export default function IncidentRemediation({
 
             setExecutions(data);
 
+            const results = await Promise.all(
+                data.map(async item => {
+
+                    try {
+
+                        const verification =
+                            await getRemediationVerification(
+                                item.id
+                            );
+
+                        return [
+                            item.id,
+                            verification
+                        ];
+
+                    } catch (err) {
+
+                        console.error(
+                            "Verification load failed for execution:",
+                            item.id,
+                            err
+                        );
+
+                        return [
+                            item.id,
+                            null
+                        ];
+                    }
+                })
+            );
+
+            const verificationMap = {};
+
+            results.forEach(
+                ([executionId, verification]) => {
+
+                    if (verification) {
+                        verificationMap[executionId] =
+                            verification;
+                    }
+                }
+            );
+
+            setVerifications(
+                verificationMap
+            );
+
         } catch (err) {
 
             console.error(
@@ -60,8 +109,34 @@ export default function IncidentRemediation({
                 err
             );
 
+            setError(
+                "Failed to load remediation history."
+            );
         }
+    }
 
+    async function loadVerification(executionId) {
+
+        try {
+
+            const data =
+                await getRemediationVerification(
+                    executionId
+                );
+
+            setVerifications(prev => ({
+                ...prev,
+                [executionId]: data
+            }));
+
+        } catch (err) {
+
+            console.error(
+                "Failed to load remediation verification:",
+                err
+            );
+
+        }
     }
 
 
@@ -422,6 +497,15 @@ export default function IncidentRemediation({
                             : item
                     )
                 );
+
+                if (
+                    updated.execution_status ===
+                    "SUCCESS"
+                ) {
+                    await loadVerification(
+                        updated.id
+                    );
+                }
 
             } else {
 
@@ -1106,6 +1190,70 @@ export default function IncidentRemediation({
 
 )}
 
+
+
+                  {execution &&
+                      verifications[execution.id] && (
+                      <div className="mt-4 w-full rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+
+                          <div className="flex items-center gap-2">
+                              <FiCheckCircle className="text-cyan-400" />
+                              <span className="text-sm font-semibold text-slate-200">
+                                  Recovery Verification
+                              </span>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+
+                              <div className="rounded-lg bg-slate-950/40 p-3">
+                                  <p className="text-[11px] text-slate-500">
+                                      Before
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-white">
+                                      {verifications[execution.id].before_value ?? "N/A"}%
+                                  </p>
+                              </div>
+
+                              <div className="rounded-lg bg-slate-950/40 p-3">
+                                  <p className="text-[11px] text-slate-500">
+                                      After
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-white">
+                                      {verifications[execution.id].after_value ?? "N/A"}%
+                                  </p>
+                              </div>
+
+                              <div className="rounded-lg bg-slate-950/40 p-3">
+                                  <p className="text-[11px] text-slate-500">
+                                      Threshold
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-white">
+                                      {verifications[execution.id].threshold_value ?? "N/A"}%
+                                  </p>
+                              </div>
+
+                          </div>
+
+                          <div className="mt-3">
+                              {verifications[execution.id].verification_status === "RECOVERED" ? (
+                                  <span className="inline-flex rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-300">
+                                      ✓ Recovery Confirmed
+                                  </span>
+                              ) : (
+                                  <span className="inline-flex rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-300">
+                                      ✕ {verifications[execution.id].verification_status}
+                                  </span>
+                              )}
+                          </div>
+
+                          {verifications[execution.id].verification_message && (
+                              <p className="mt-2 text-xs text-slate-400">
+                                  {verifications[execution.id].verification_message}
+                              </p>
+                          )}
+
+                      </div>
+                  )}
 
 {execution?.execution_status ===
     "APPROVED" &&

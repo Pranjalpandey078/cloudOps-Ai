@@ -4,6 +4,7 @@ import time
 from modules.ai.service import AIService
 from modules.incidents.repository import IncidentRepository
 from modules.timeline.service import TimelineService
+from modules.monitoring.evidence_repository import EvidenceRepository
 
 
 class IncidentAIWorker:
@@ -88,6 +89,19 @@ class IncidentAIWorker:
 
         ai_service = AIService()
         repository = IncidentRepository()
+        evidence_repository = EvidenceRepository()
+
+        evidence = evidence_repository.get_for_incident(
+            incident_id
+        )
+
+        incident = dict(incident)
+        incident["evidence"] = evidence
+
+        print(
+            f"Loaded {len(evidence)} evidence record(s) "
+            f"for Incident #{incident_id}"
+        )
 
         repository.update_ai_status(
             incident_id,

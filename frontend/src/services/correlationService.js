@@ -5,7 +5,45 @@ const API = axios.create({
     baseURL: API_BASE_URL
 });
 
+function authHeaders() {
+    const token = localStorage.getItem("token");
+
+    return token
+        ? {
+            Authorization: `Bearer ${token}`
+        }
+        : {};
+}
+
 export async function getCorrelationGroups() {
-    const response = await API.get("/groups");
-    return response.data.data;
+    const response = await API.get(
+        "/groups",
+        {
+            headers: authHeaders()
+        }
+    );
+
+    return response.data.data || [];
+}
+
+export async function getCorrelationStats() {
+    const response = await API.get(
+        "/groups/stats",
+        {
+            headers: authHeaders()
+        }
+    );
+
+    return response.data.data || {};
+}
+
+export async function getRelatedIncidents(incidentId) {
+    const response = await API.get(
+        `/incidents/${incidentId}/related`,
+        {
+            headers: authHeaders()
+        }
+    );
+
+    return response.data.data || [];
 }

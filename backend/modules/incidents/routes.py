@@ -55,6 +55,14 @@ incidents_bp.route(
 
 
 incidents_bp.route(
+    "/<int:incident_id>/remediation",
+    methods=["POST"]
+)(
+    login_required(controller.remediation)
+)
+
+
+incidents_bp.route(
     "/<int:incident_id>/related",
     methods=["GET"]
 )(

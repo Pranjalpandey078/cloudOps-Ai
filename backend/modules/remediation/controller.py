@@ -45,6 +45,13 @@ class RemediationController:
             execution_id
         )
 
+    def get_verification(self, execution_id):
+
+        return self.service.get_verification(
+            execution_id
+        )
+
+
     def execute(self, execution_id):
 
         return self.service.execute(

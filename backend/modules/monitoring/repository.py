@@ -209,3 +209,68 @@ class MonitoringRepository:
         finally:
 
             connection.close()
+
+
+    def get_local_server_id(self):
+
+        connection = Database.get_connection()
+
+        try:
+            cursor = connection.cursor(DictCursor)
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM servers
+                WHERE discovery_source = 'LINUX'
+                  AND is_deleted = FALSE
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """
+            )
+
+            row = cursor.fetchone()
+
+            if row:
+                return row["id"]
+
+            return None
+
+        finally:
+            connection.close()
+
+
+    def get_server_context(self, server_id):
+
+        connection = Database.get_connection()
+
+        try:
+            cursor = connection.cursor(DictCursor)
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    organization_id,
+                    hostname,
+                    operating_system,
+                    status
+                FROM servers
+                WHERE id=%s
+                  AND is_deleted=FALSE
+                LIMIT 1
+                """,
+                (server_id,)
+            )
+
+            row = cursor.fetchone()
+
+            if not row:
+                raise ValueError(
+                    f"Server {server_id} is not registered."
+                )
+
+            return row
+
+        finally:
+            connection.close()

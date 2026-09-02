@@ -50,3 +50,34 @@ backend/logs/
 # Python test/debug scripts used locally
 backend/test_ai.py
 *.phase1_backup
+deployment/mysql/seed.sql
+deployment/cloudops_ai_schema.sql
+
+# Development snapshots / rollback copies
+*.before_*
+*.before-*
+*.backup
+*.backup-*
+*.bak
+backend/backups/
+
+# Corrupted/local recovery copies
+*.corrupted-backup
+*.corrupted_backup
+
+# OS / generated files
+.DS_Store
+**/.DS_Store
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Local logs
+*.log
+backend/logs/
+
+# Frontend build output
+frontend/dist/
+
+# Local test/debug files
+backend/test_ai.py

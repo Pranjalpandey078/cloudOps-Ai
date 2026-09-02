@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, g
 
 from modules.incidents.service import IncidentService
 
@@ -59,4 +59,12 @@ class IncidentController:
         return self.service.chat(
             incident_id,
             question
+        )
+
+    def remediation(self, incident_id):
+
+        return self.service.remediation(
+            incident_id,
+            user_id=g.user_id,
+            ip_address=request.remote_addr
         )

@@ -122,3 +122,19 @@ export async function executeRemediation(
 
     return response.data;
 }
+
+
+// Get verification result for a remediation execution
+export async function getRemediationVerification(
+    executionId
+) {
+
+    const response = await API.get(
+        `/api/remediation/${executionId}/verification`,
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    return response.data.data || null;
+}

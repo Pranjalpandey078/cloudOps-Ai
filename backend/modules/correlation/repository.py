@@ -154,6 +154,16 @@ class CorrelationRepository:
                     AND g.organization_id=%s
                     AND g.root_cause=%s
                     AND g.severity=%s
+                    AND EXISTS (
+                        SELECT 1
+                        FROM incident_correlation_items i
+                        JOIN incidents inc
+                            ON inc.id = i.incident_id
+                        WHERE
+                            i.group_id = g.id
+                            AND inc.server_id = %s
+                            AND inc.metric_name = %s
+                    )
                     AND TIMESTAMPDIFF(
                         MINUTE,
                         g.updated_at,
@@ -166,7 +176,9 @@ class CorrelationRepository:
                 (
                     organization_id,
                     metric_name,
-                    severity
+                    severity,
+                    server_id,
+                    metric_name
                 )
             )
 

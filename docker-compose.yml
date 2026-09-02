@@ -1,3 +1,87 @@
-version: "3.9"
-
 services:
+
+  db:
+    image: mysql:8.0
+    container_name: cloudops-ai-db
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: cloudops_ai
+      MYSQL_USER: cloudops
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
+    volumes:
+      - cloudops_mysql:/var/lib/mysql
+      - ./deployment/mysql/init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p$${MYSQL_ROOT_PASSWORD}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  backend:
+    build:
+      context: ./backend
+
+    container_name: cloudops-ai-backend
+    restart: unless-stopped
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      FLASK_ENV: production
+
+      PORT: 5001
+
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: cloudops_ai
+      MYSQL_USER: cloudops
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+      JWT_EXPIRE_MINUTES: 60
+
+      AI_PROVIDER: OLLAMA
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MONITORING_AGENT_KEY: ${MONITORING_AGENT_KEY}
+
+    expose:
+      - "5001"
+
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+
+    container_name: cloudops-ai-frontend
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    ports:
+      - "8080:80"
+
+
+volumes:
+  cloudops_mysql:
