@@ -1,6 +1,7 @@
 from flask import Blueprint
 
 from modules.auth.controller import AuthController
+from shared.auth_middleware import super_admin_required
 
 auth_bp = Blueprint(
 
@@ -20,7 +21,7 @@ auth_bp.route(
 
     methods=["POST"]
 
-)(controller.register)
+)(super_admin_required(controller.register))
 auth_bp.route(
 
     "/login",
