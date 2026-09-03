@@ -137,10 +137,16 @@ class IncidentAIWorker:
                     )
                 )
 
+                print(
+                    f"AI remediation started for Incident #{incident_id}"
+                )
                 remediation_result = (
                     ai_service.generate_remediation(
                         incident
                     )
+                )
+                print(
+                    f"AI remediation completed for Incident #{incident_id}"
                 )
 
                 analysis = (

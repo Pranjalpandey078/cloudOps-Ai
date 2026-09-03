@@ -80,244 +80,311 @@ Provide a concise, evidence-grounded DevOps answer.
     def __init__(self):
         self.provider = AIProviderFactory.get_provider()
 
+    @staticmethod
+    def _fallback_incident_analysis(incident):
+        """
+        Deterministic fallback used when the local LLM returns malformed,
+        unsafe, or contract-breaking incident analysis.
+
+        The fallback is intentionally evidence-grounded and never invents
+        an underlying root cause.
+        """
+        severity = str(incident.get("severity", "UNKNOWN")).strip()
+        metric_name = str(
+            incident.get("metric_name", "metric")
+        ).strip()
+
+        return {
+            "analysis": {
+                "root_cause": (
+                    "Root cause cannot be determined from "
+                    "the available incident evidence."
+                ),
+                "impact": (
+                    f"The {metric_name} condition triggered the incident "
+                    "threshold. Specific service impact is not confirmed "
+                    "by the available evidence."
+                ),
+                "severity": severity,
+                "severity_assessment": (
+                    f"The incident severity is {severity}. The supplied "
+                    f"{metric_name} condition triggered the incident; "
+                    "no additional evidence supports changing that severity."
+                ),
+                "condition_confidence": 1.0,
+                "root_cause_confidence": 0.0,
+                "recommended_actions": [
+                    f"Verify the current {metric_name} condition on the affected server.",
+                    f"Collect diagnostic evidence related to the {metric_name} condition.",
+                    "Identify the responsible resource or process before applying remediation."
+                ],
+                "prevention_steps": [
+                    f"Maintain monitoring of {metric_name} against its configured threshold.",
+                    "Review alert thresholds using observed operating patterns.",
+                    "Document and automate an evidence-based response for recurring threshold breaches."
+                ]
+            }
+        }
+
     def analyze_incident(self, incident):
+        try:
+            raw_analysis = self.provider.analyze_incident(
+                incident
+            )
 
-        raw_analysis = self.provider.analyze_incident(
-            incident
-        )
-
-        if isinstance(raw_analysis, dict):
-            analysis = raw_analysis
-        else:
-            try:
+            if isinstance(raw_analysis, dict):
+                analysis = raw_analysis
+            else:
                 analysis = json.loads(
                     raw_analysis.strip()
                 )
-            except (
-                json.JSONDecodeError,
-                AttributeError
-            ) as error:
-                raise ValueError(
-                    "AI provider returned invalid JSON analysis"
-                ) from error
 
-        required_fields = {
-            "root_cause",
-            "impact",
-            "severity",
-            "severity_assessment",
-            "condition_confidence",
-            "root_cause_confidence",
-            "recommended_actions",
-            "prevention_steps"
-        }
-
-        missing_fields = (
-            required_fields - set(analysis.keys())
-        )
-
-        if missing_fields:
-            raise ValueError(
-                "AI analysis missing required fields: "
-                + ", ".join(sorted(missing_fields))
-            )
-
-        if analysis["severity"] != incident["severity"]:
-            raise ValueError(
-                "AI analysis severity does not match "
-                "incident severity"
-            )
-
-        if not isinstance(
-            analysis["recommended_actions"],
-            list
-        ):
-            raise ValueError(
-                "recommended_actions must be a list"
-            )
-
-        if not isinstance(
-            analysis["prevention_steps"],
-            list
-        ):
-            raise ValueError(
-                "prevention_steps must be a list"
-            )
-
-        condition_confidence = analysis[
-            "condition_confidence"
-        ]
-
-        root_cause_confidence = analysis[
-            "root_cause_confidence"
-        ]
-
-        for field_name, value in (
-            (
+            required_fields = {
+                "root_cause",
+                "impact",
+                "severity",
+                "severity_assessment",
                 "condition_confidence",
-                condition_confidence
-            ),
-            (
                 "root_cause_confidence",
-                root_cause_confidence
+                "recommended_actions",
+                "prevention_steps"
+            }
+
+            missing_fields = (
+                required_fields - set(analysis.keys())
             )
-        ):
-            if (
-                not isinstance(value, (int, float))
-                or isinstance(value, bool)
-                or not 0.0 <= value <= 1.0
+
+            if missing_fields:
+                raise ValueError(
+                    "AI analysis missing required fields: "
+                    + ", ".join(sorted(missing_fields))
+                )
+
+            if analysis["severity"] != incident["severity"]:
+                raise ValueError(
+                    "AI analysis severity does not match "
+                    "incident severity"
+                )
+
+            if not isinstance(
+                analysis["recommended_actions"],
+                list
             ):
                 raise ValueError(
-                    f"{field_name} must be between 0.0 and 1.0"
+                    "recommended_actions must be a list"
                 )
 
-        expected_unknown_root_cause = (
-            "Root cause cannot be determined from "
-            "the available incident evidence."
-        )
-
-        root_cause = str(
-            analysis["root_cause"]
-        ).strip()
-
-        if root_cause != expected_unknown_root_cause:
-            raise ValueError(
-                "AI analysis contains an unsupported "
-                "root cause claim"
-            )
-
-        forbidden_claims = (
-            "data corruption",
-            "data loss",
-            "inadequate cooling",
-            "cooling system",
-            "memory leak",
-            "underutilization",
-            "server underutilization",
-            "system crash",
-            "system crashes",
-            "database failure",
-            "network failure"
-        )
-
-        text_to_validate = " ".join([
-            str(analysis["impact"]),
-            str(analysis["severity_assessment"]),
-            " ".join(
-                str(item)
-                for item in analysis["recommended_actions"]
-            ),
-            " ".join(
-                str(item)
-                for item in analysis["prevention_steps"]
-            )
-        ]).lower()
-
-        for forbidden_claim in forbidden_claims:
-            if forbidden_claim in text_to_validate:
+            if not isinstance(
+                analysis["prevention_steps"],
+                list
+            ):
                 raise ValueError(
-                    "AI analysis contains unsupported "
-                    f"claim: {forbidden_claim}"
+                    "prevention_steps must be a list"
                 )
 
+            for field_name in (
+                "condition_confidence",
+                "root_cause_confidence"
+            ):
+                value = analysis[field_name]
+
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not 0.0 <= value <= 1.0
+                ):
+                    raise ValueError(
+                        f"{field_name} must be between 0.0 and 1.0"
+                    )
+
+            expected_unknown_root_cause = (
+                "Root cause cannot be determined from "
+                "the available incident evidence."
+            )
+
+            root_cause = str(
+                analysis["root_cause"]
+            ).strip()
+
+            if root_cause != expected_unknown_root_cause:
+                raise ValueError(
+                    "AI analysis contains an unsupported "
+                    "root cause claim"
+                )
+
+            if (
+                root_cause == expected_unknown_root_cause
+                and analysis["root_cause_confidence"] > 0.20
+            ):
+                raise ValueError(
+                    "AI analysis root cause confidence is too high "
+                    "when root cause is undetermined"
+                )
+
+            forbidden_claims = (
+                "data corruption",
+                "data loss",
+                "inadequate cooling",
+                "cooling system",
+                "memory leak",
+                "underutilization",
+                "server underutilization",
+                "system crash",
+                "system crashes",
+                "database failure",
+                "network failure"
+            )
+
+            text_to_validate = " ".join([
+                str(analysis["impact"]),
+                str(analysis["severity_assessment"]),
+                " ".join(
+                    str(item)
+                    for item in analysis["recommended_actions"]
+                ),
+                " ".join(
+                    str(item)
+                    for item in analysis["prevention_steps"]
+                )
+            ]).lower()
+
+            for forbidden_claim in forbidden_claims:
+                if forbidden_claim in text_to_validate:
+                    raise ValueError(
+                        "AI analysis contains unsupported "
+                        f"claim: {forbidden_claim}"
+                    )
+
+            return {
+                "analysis": analysis
+            }
+
+        except Exception as error:
+            print(
+                "AI analysis validation/provider failure; "
+                f"using deterministic fallback: {error}"
+            )
+
+            return self._fallback_incident_analysis(
+                incident
+            )
+
+    @staticmethod
+    def _fallback_remediation(incident):
+        """
+        Safe deterministic diagnostic fallback used when the local LLM
+        returns an invalid or unsafe remediation response.
+        """
         return {
-            "analysis": analysis
+            "remediation": """Linux Commands
+uptime
+df -h
+
+Docker Commands
+docker ps
+docker stats --no-stream
+
+Kubernetes Commands
+kubectl get pods
+kubectl get nodes
+
+AWS Actions
+aws ec2 describe-instances
+aws cloudwatch describe-alarms"""
         }
 
     def generate_remediation(self, incident):
-
-        remediation = self.provider.remediation(
-            incident
-        )
-
-        if not isinstance(remediation, str):
-            raise ValueError(
-                "AI remediation must be a string"
+        try:
+            remediation = self.provider.remediation(
+                incident
             )
 
-        required_sections = (
-            "Linux Commands",
-            "Docker Commands",
-            "Kubernetes Commands",
-            "AWS Actions"
-        )
-
-        for section in required_sections:
-            if section not in remediation:
+            if not isinstance(remediation, str):
                 raise ValueError(
-                    f"AI remediation missing required section: {section}"
+                    "AI remediation must be a string"
                 )
 
-        malformed_commands = (
-            "kubectl getpods",
-            "kubectl getnodes",
-            "kubectl getservices",
-            "docker ps--",
-            "docker stats--",
-            "aws ec2describe",
-            "aws cloudwatchdescribe"
-        )
+            required_sections = (
+                "Linux Commands",
+                "Docker Commands",
+                "Kubernetes Commands",
+                "AWS Actions"
+            )
 
-        normalized_remediation = remediation.lower()
+            for section in required_sections:
+                if section not in remediation:
+                    raise ValueError(
+                        f"AI remediation missing required section: {section}"
+                    )
 
-        for malformed_command in malformed_commands:
-            if malformed_command in normalized_remediation:
-                raise ValueError(
-                    "AI remediation contains malformed command: "
-                    f"{malformed_command}"
-                )
+            malformed_commands = (
+                "kubectl getpods",
+                "kubectl getnodes",
+                "kubectl getservices",
+                "docker ps--",
+                "docker stats--",
+                "aws ec2describe",
+                "aws cloudwatchdescribe"
+            )
 
-        dangerous_commands = (
-            "rm ",
-            "rm\\n",
-            "kill ",
-            "pkill ",
-            "reboot",
-            "shutdown",
-            "systemctl stop",
-            "systemctl disable",
-            "docker stop",
-            "docker rm",
-            "docker restart",
-            "kubectl delete",
-            "kubectl scale",
-            "kubectl patch",
-            "kubectl apply",
-            "aws terminate",
-            "aws delete",
-            "aws stop",
-            "aws modify",
-            "aws update",
-            "aws put"
-        )
+            normalized_remediation = remediation.lower()
 
-        for command in dangerous_commands:
-            if command in normalized_remediation:
-                raise ValueError(
-                    "AI remediation contains a potentially "
-                    f"destructive command: {command.strip()}"
-                )
+            for malformed_command in malformed_commands:
+                if malformed_command in normalized_remediation:
+                    raise ValueError(
+                        "AI remediation contains a malformed command: "
+                        f"{malformed_command}"
+                    )
 
-        dangerous_operators = (
-            "&&",
-            "||",
-            ";",
-            ">",
-            ">>",
-            "|"
-        )
+            forbidden_patterns = (
+                "rm ",
+                "kill ",
+                "pkill ",
+                "reboot",
+                "shutdown",
+                "systemctl stop",
+                "systemctl disable",
+                "docker stop",
+                "docker rm",
+                "docker restart",
+                "kubectl delete",
+                "kubectl scale",
+                "kubectl patch",
+                "kubectl apply",
+                "aws terminate",
+                "aws delete",
+                "aws stop",
+                "aws modify",
+                "aws update",
+                "aws put",
+                "&&",
+                "||",
+                ";",
+                ">",
+                ">>",
+                "|"
+            )
 
-        for operator in dangerous_operators:
-            if operator in remediation:
-                raise ValueError(
-                    "AI remediation contains a "
-                    f"forbidden shell operator: {operator}"
-                )
+            for forbidden_pattern in forbidden_patterns:
+                if forbidden_pattern in normalized_remediation:
+                    raise ValueError(
+                        "AI remediation contains a forbidden operation "
+                        f"or shell operator: {forbidden_pattern}"
+                    )
 
-        return {
-            "remediation": remediation
-        }
+            return {
+                "remediation": remediation
+            }
 
+        except Exception as error:
+            print(
+                "AI remediation provider/validation failure; "
+                f"using deterministic fallback: {error}"
+            )
+
+            return self._fallback_remediation(
+                incident
+            )
 
     def chat_with_incident(self, incident, question):
 

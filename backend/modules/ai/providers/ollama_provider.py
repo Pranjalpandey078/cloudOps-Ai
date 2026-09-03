@@ -16,6 +16,7 @@ class OllamaProvider(AIProvider):
     )
 
     MODEL = __import__("os").getenv("OLLAMA_MODEL", "llama3.2:3b")
+    TIMEOUT = int(__import__("os").getenv("OLLAMA_TIMEOUT", "120"))
 
     def generate(self, prompt):
 
@@ -31,7 +32,7 @@ class OllamaProvider(AIProvider):
                 "prompt": prompt,
                 "stream": False
             },
-            timeout=120
+            timeout=self.TIMEOUT
         )
 
         response.raise_for_status()
@@ -108,15 +109,30 @@ ROOT CAUSE RULES
 
    "Root cause cannot be determined from the available incident evidence."
 
-4. You may provide possible causes only when clearly labeled as
-   hypotheses, not confirmed facts.
-5. Never convert a hypothesis into a confirmed root cause.
-6. Confidence must reflect the available evidence, not how confident
+4. The root_cause field must contain ONLY a confirmed root cause
+   supported directly by the supplied evidence.
+5. If the evidence does not directly prove an underlying root cause,
+   the root_cause field MUST be exactly:
+   "Root cause cannot be determined from the available incident evidence."
+6. Never place a hypothesis in the root_cause field.
+7. If root_cause uses the required unknown-root-cause statement, then
+   root_cause_confidence MUST be <= 0.20.
+8. Confidence must reflect the available evidence, not how confident
    the model sounds.
-7. A threshold violation alone should normally have moderate confidence
+9. When no diagnostic evidence is provided, treat the underlying
+   root cause as unconfirmed and use the exact required root-cause
+   statement above.
+10. A threshold violation alone should normally have high confidence
    for the threshold condition and low confidence for an underlying
    root cause.
-8. Do not invent monitoring data or historical events.
+11. The severity_assessment MUST mention the actual supplied incident
+    severity exactly and MUST NOT mention any other severity.
+12. Every recommended_actions item MUST be specific to the supplied
+    incident evidence. Never use generic placeholder or template wording.
+13. Every prevention_steps item MUST be specific and actionable for the
+    supplied incident. Never use generic placeholder wording.
+14. Do not invent causes, measurements, historical events, infrastructure
+    components, or failures that are not present in the evidence.
 
 
 SEVERITY RULES
@@ -132,21 +148,6 @@ is appropriate using the available metric and threshold evidence.
 
 The "severity" field in the JSON output MUST exactly match the supplied
 incident severity.
-
-For example, if:
-
-Severity = CRITICAL
-Metric = MEMORY
-Current Value = 87.90
-Threshold = 78.00
-
-then:
-
-"severity": "CRITICAL"
-
-and the severity_assessment must explain that the MEMORY value exceeds
-the configured threshold and that CRITICAL is the supplied incident
-severity.
 
 Do NOT describe the supplied severity as moderate, low, medium,
 less severe, or inappropriate.
@@ -189,6 +190,17 @@ OUTPUT RULES
 
 Return ONLY valid JSON.
 
+Before returning JSON, verify:
+
+- severity exactly matches the supplied incident severity.
+- severity_assessment names only that supplied severity.
+- root_cause is evidence-supported or exactly the required unknown statement.
+- if root_cause is unknown, root_cause_confidence is <= 0.20.
+- confidence values are numbers from 0 to 1.
+- recommended_actions are concrete and incident-specific.
+- prevention_steps are concrete and incident-specific.
+- no placeholder or template recommendation text is present.
+
 Do not use markdown.
 Do not use backticks.
 Do not include text before or after the JSON.
@@ -198,19 +210,21 @@ Use exactly this structure:
 {{
   "root_cause": "Confirmed root cause only if supported by evidence, otherwise state that the root cause cannot be determined from the available incident evidence.",
   "impact": "Evidence-based likely operational impact.",
-  "severity": "CRITICAL",
-  "severity_assessment": "Evidence-based assessment of the supplied severity.",
+  "severity": "{incident["severity"]}",
+  "severity_assessment": "Explain why the supplied incident severity is supported by the supplied metric and threshold evidence.",
   "condition_confidence": 1.0,
   "root_cause_confidence": 0.0,
   "recommended_actions": [
-    "First practical diagnostic or remediation action.",
-    "Second practical diagnostic or remediation action.",
-    "Third practical diagnostic or remediation action."
+    "Inspect the specific metric, process, or resource implicated by the supplied incident evidence.",
+    "Collect diagnostic evidence needed to identify the underlying cause.",
+    "Apply a safe remediation only after the evidence confirms the cause."
   ],
+
   "prevention_steps": [
-    "First long-term prevention measure.",
-    "Second long-term prevention measure."
-  ],
+    "Add a preventive control directly related to the observed incident condition.",
+    "Improve monitoring or threshold configuration based on the observed condition.",
+    "Document and automate an appropriate preventive response supported by the evidence."
+  ]
 }}
 
 CONFIDENCE GUIDANCE
