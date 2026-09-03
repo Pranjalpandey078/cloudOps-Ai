@@ -15,7 +15,7 @@ class OllamaProvider(AIProvider):
         + "/api/generate"
     )
 
-    MODEL = "llama3.2:3b"
+    MODEL = __import__("os").getenv("OLLAMA_MODEL", "llama3.2:3b")
 
     def generate(self, prompt):
 
