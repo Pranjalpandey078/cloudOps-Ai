@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import MonitoringCharts from "../components/monitoring/MonitoringCharts";
 import ServerGrid from "../components/monitoring/ServerGrid";
+import AwsMonitoring from "../components/monitoring/aws/AwsMonitoring";
 import { getOverview } from "../services/monitoringService";
 import socket from "../socket/socket";
 export default function Monitoring() {
@@ -113,6 +114,8 @@ export default function Monitoring() {
             </div>
 
             <MonitoringCharts />
+
+            <AwsMonitoring />
 
             <ServerGrid />
 

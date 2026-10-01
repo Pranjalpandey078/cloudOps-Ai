@@ -36,3 +36,14 @@ export async function getLatestMetrics() {
 
     return response.data.data || response.data || [];
 }
+
+export async function getAwsMetrics() {
+    const response = await API.get(
+        "/api/monitoring/aws-metrics",
+        {
+            headers: getAuthHeaders()
+        }
+    );
+
+    return response.data.data || response.data || [];
+}
